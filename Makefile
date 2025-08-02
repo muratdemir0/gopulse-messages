@@ -9,3 +9,9 @@ linter:
 
 linter-fix:
 	golangci-lint run --fix ./...
+
+govulncheck:
+	govulncheck ./...
+
+gosec:
+	gosec ./...

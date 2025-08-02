@@ -29,7 +29,7 @@ jobs:
       run: go test -v -tags=integration ./...
 
     - name: Install govulncheck
-      run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.0
+      run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
 
     - name: Run Dependency Security Check
       run: govulncheck ./...
