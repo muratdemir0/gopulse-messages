@@ -25,13 +25,14 @@ func TestSend(t *testing.T) {
 				Content: "Hello, world!",
 			},
 			response: webhook.Response{
-				Message: "Hello, world!",
+				Message: "Accepted",
+				MessageID: "1234567890",
 			},
 			wantErr: false,
 			testSetup: func(t *testing.T) (webhook.Client, func()) {
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{"message": "Hello, world!", "messageId": "1234567890"}`))
+					w.Write([]byte(`{"message": "Accepted", "messageId": "1234567890"}`))
 				}))
 				return *webhook.NewClient(server.URL, ohttp.NewClient()), server.Close
 			},
