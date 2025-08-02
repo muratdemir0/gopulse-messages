@@ -1,0 +1,10 @@
+app:
+  name: test
+  port: 8080
+
+webhook:
+  host: http://localhost:8080
+  path: /webhook
+
+
+
