@@ -35,7 +35,7 @@ jobs:
       run: govulncheck ./...
 
     - name: Install gosec
-      run: go install github.com/securego/gosec/v2/cmd/gosec@v2.20.0
+      run: go install github.com/securego/gosec/v2/cmd/gosec@v2.22.7
       
     - name: Run gosec
       run: gosec ./...
