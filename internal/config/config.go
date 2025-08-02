@@ -16,9 +16,16 @@ type Webhook struct {
 	Path string `mapstructure:"path"`
 }
 
+type Redis struct {
+	Addr     string `mapstructure:"addr"`
+	Password string `mapstructure:"password"`
+	DB       int    `mapstructure:"db"`
+}
+
 type Config struct {
 	App     App     `mapstructure:"app"`
 	Webhook Webhook `mapstructure:"webhook"`
+	Redis   Redis   `mapstructure:"redis"`
 }
 
 func Load(path string) (*Config, error) {
