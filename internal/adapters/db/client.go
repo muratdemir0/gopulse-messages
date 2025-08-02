@@ -11,10 +11,10 @@ import (
 	"github.com/doug-martin/goqu/v9/dialect/postgres"
 	"github.com/google/uuid"
 
-	"github.com/doug-martin/goqu/v9"
-	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+
+	"github.com/doug-martin/goqu/v9"
 )
 
 const (

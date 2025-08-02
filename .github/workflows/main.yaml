@@ -1,0 +1,73 @@
+name: Go CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  pre-requirements:
+    name: Pre-Requirements
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v6.0.1
+      with:
+        version: v2.3.0
+        
+    - name: Run Unit Tests
+      run: go test -v -tags=unit ./...
+
+    - name: Run Integration Tests
+      run: go test -v -tags=integration ./...
+
+    - name: Install govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.0
+
+    - name: Run Dependency Security Check
+      run: govulncheck ./...
+
+    - name: Install gosec
+      run: go install github.com/securego/gosec/v2/cmd/gosec@v2.20.0
+      
+    - name: Run gosec
+      run: gosec ./...
+
+  build:
+    name: Build
+    needs: pre-requirements
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Build Application
+      run: go build -v -o myapp ./cmd/api/...
+
+  deploy:
+    name: Deploy to DigitalOcean
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+    - name: Deploy to App Platform
+      run: |
+        # Replace YOUR_APP_ID with your actual DigitalOcean App ID
+        # You should store your App ID as a secret in your repository settings
+        doctl apps create-deployment ${{ secrets.DIGITALOCEAN_APP_ID }} --wait

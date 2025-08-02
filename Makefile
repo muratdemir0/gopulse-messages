@@ -3,3 +3,9 @@ unit-test:
 
 integration-test:
 	go test -v -tags=integration ./...
+
+linter:
+	golangci-lint run ./... 
+
+linter-fix:
+	golangci-lint run --fix ./...
