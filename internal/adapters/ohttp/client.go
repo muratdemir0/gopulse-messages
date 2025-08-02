@@ -44,8 +44,6 @@ func NewClient(transport ...*http.Transport) *Client {
 	}
 }
 
-
-
 func createOptimizedTransport() *http.Transport {
 	return &http.Transport{
 		MaxIdleConns:        DefaultMaxIdleConns,
