@@ -1,3 +1,4 @@
+//go:build unit
 package ohttp_test
 
 import (
