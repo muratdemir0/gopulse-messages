@@ -18,6 +18,9 @@ func TestLoad(t *testing.T) {
 		assert.Equal(t, 8080, cfg.App.Port)
 		assert.Equal(t, "http://localhost:8080", cfg.Webhook.Host)
 		assert.Equal(t, "/webhook/gopulse-messages", cfg.Webhook.Path)
+		assert.Equal(t, "localhost:6379", cfg.Redis.Addr)
+		assert.Equal(t, "", cfg.Redis.Password)
+		assert.Equal(t, 0, cfg.Redis.DB)
 	})
 
 	t.Run("given a non-existent config file, it should return an error", func(t *testing.T) {
