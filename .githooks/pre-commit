@@ -1,0 +1,85 @@
+#!/bin/sh
+
+# Pre-commit hook based on .github/workflows/main.yaml
+color_red() {
+    printf '\033[0;31m%s\033[0m\n' "$1"
+}
+
+color_yellow() {
+    printf '\033[0;33m%s\033[0m\n' "$1"
+}
+
+color_green() {
+    printf '\033[0;32m%s\033[0m\n' "$1"
+}
+
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+echo "Running pre-commit checks..."
+
+all_tools_installed=true
+if ! command_exists golangci-lint; then
+    color_red "Error: golangci-lint is not installed."
+    echo "Please install it to match the CI pipeline."
+    echo "See: https://golangci-lint.run/usage/install/"
+    all_tools_installed=false
+fi
+
+if ! command_exists govulncheck; then
+    color_red "Error: govulncheck is not installed."
+    echo "Please run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4"
+    all_tools_installed=false
+fi
+
+if ! command_exists gosec; then
+    color_red "Error: gosec is not installed."
+    echo "Please run: go install github.com/securego/gosec/v2/cmd/gosec@v2.22.7"
+    all_tools_installed=false
+fi
+
+if [ "$all_tools_installed" = false ]; then
+    color_red "Aborting commit due to missing tools. Please install the tools listed above."
+    exit 1
+fi
+
+echo
+color_yellow "Running golangci-lint..."
+golangci-lint run ./...
+if [ $? -ne 0 ]; then
+  color_red "golangci-lint failed. Aborting commit."
+  exit 1
+fi
+color_green "golangci-lint passed."
+
+echo
+color_yellow "Running Unit Tests (tagged 'unit')..."
+go test -v -tags=unit ./...
+if [ $? -ne 0 ]; then
+  color_red "Unit tests failed. Aborting commit."
+  exit 1
+fi
+color_green "Unit tests passed."
+
+echo
+color_yellow "Running govulncheck for dependency security..."
+govulncheck ./...
+if [ $? -ne 0 ]; then
+  color_red "govulncheck failed. Aborting commit."
+  exit 1
+fi
+color_green "govulncheck passed."
+
+echo
+color_yellow "Running gosec for static code analysis..."
+gosec ./...
+if [ $? -ne 0 ]; then
+  color_red "gosec failed. Aborting commit."
+  exit 1
+fi
+color_green "gosec passed."
+
+echo
+color_green "All pre-commit checks passed. Proceeding with commit."
+exit 0
