@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -15,9 +15,10 @@ type Scheduler struct {
 	stopCh   chan struct{}
 	ctx      context.Context
 	cancel   context.CancelFunc
+	logger   *slog.Logger
 }
 
-func NewScheduler(interval time.Duration, task func(ctx context.Context) error) *Scheduler {
+func NewScheduler(interval time.Duration, task func(ctx context.Context) error, logger *slog.Logger) *Scheduler {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Scheduler{
 		interval: interval,
@@ -26,6 +27,7 @@ func NewScheduler(interval time.Duration, task func(ctx context.Context) error) 
 		stopCh:   make(chan struct{}),
 		ctx:      ctx,
 		cancel:   cancel,
+		logger:   logger.With(slog.String("component", "scheduler")),
 	}
 }
 
@@ -63,14 +65,14 @@ func (s *Scheduler) run() {
 	defer ticker.Stop()
 
 	if err := s.task(s.ctx); err != nil {
-		log.Printf("failed to execute task: %v", err)
+		s.logger.Error("failed to execute task", "error", err)
 	}
 
 	for {
 		select {
 		case <-ticker.C:
 			if err := s.task(s.ctx); err != nil {
-				log.Printf("failed to execute task: %v", err)
+				s.logger.Error("failed to execute task", "error", err)
 			}
 		case <-s.ctx.Done():
 			return

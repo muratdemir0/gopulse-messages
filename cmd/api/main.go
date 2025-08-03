@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -34,9 +34,14 @@ type App struct {
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})))
+
 	app, err := NewApp()
 	if err != nil {
-		log.Fatalf("failed to create app: %v", err)
+		slog.Error("failed to create app", "error", err)
+		os.Exit(1)
 	}
 	defer app.Close()
 
@@ -51,10 +56,11 @@ func main() {
 	select {
 	case err := <-serverErrors:
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server error: %v", err)
+			slog.Error("Server error", "error", err)
+			os.Exit(1)
 		}
 	case sig := <-quit:
-		log.Printf("Shutdown signal received: %v", sig)
+		slog.Info("Shutdown signal received", "signal", sig.String())
 	}
 
 	app.Stop()
@@ -66,7 +72,7 @@ func NewApp() (*App, error) {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	log.Printf("Starting %s on port %d", cfg.App.Name, cfg.App.Port)
+	slog.Info("Starting application", "name", cfg.App.Name, "port", cfg.App.Port)
 
 	app := &App{config: cfg}
 
@@ -86,49 +92,50 @@ func NewApp() (*App, error) {
 
 func (a *App) Start() error {
 	if err := a.messageService.StartAutoSending(); err != nil {
-		log.Printf("Warning: failed to start automatic message sending: %v", err)
+		slog.Warn("failed to start automatic message sending", "error", err)
 	} else {
-		log.Println("Automatic message sending started")
+		slog.Info("Automatic message sending started")
 	}
 
-	log.Printf("Server starting on port %d", a.config.App.Port)
+	slog.Info("Server starting", "port", a.config.App.Port)
 	return a.server.ListenAndServe()
 }
 
 func (a *App) Stop() {
-	log.Println("Starting graceful shutdown...")
+	slog.Info("Starting graceful shutdown...")
 
 	a.server.SetKeepAlivesEnabled(false)
 
 	if err := a.messageService.StopAutoSending(); err != nil {
-		log.Printf("Warning: failed to stop automatic message sending: %v", err)
+		slog.Warn("failed to stop automatic message sending", "error", err)
 	} else {
-		log.Println("Automatic message sending stopped")
+		slog.Info("Automatic message sending stopped")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := a.server.Shutdown(ctx); err != nil {
-		log.Printf("Graceful shutdown failed: %v", err)
+		slog.Error("Graceful shutdown failed", "error", err)
 		if err := a.server.Close(); err != nil {
-			log.Fatalf("Forced shutdown failed: %v", err)
+			slog.Error("Forced shutdown failed", "error", err)
+			os.Exit(1)
 		}
 	}
 
-	log.Println("Server gracefully stopped")
+	slog.Info("Server gracefully stopped")
 }
 
 func (a *App) Close() {
 	if a.db != nil {
 		if err := a.db.Close(); err != nil {
-			log.Printf("failed to close database connection: %v", err)
+			slog.Warn("failed to close database connection", "error", err)
 		}
 	}
 
 	if a.redis != nil {
 		if err := a.redis.Close(); err != nil {
-			log.Printf("failed to close redis connection: %v", err)
+			slog.Warn("failed to close redis connection", "error", err)
 		}
 	}
 }
@@ -139,7 +146,7 @@ func (a *App) initDatabase() error {
 		return err
 	}
 	a.db = dbClient
-	log.Println("Database connection established")
+	slog.Info("Database connection established")
 	return nil
 }
 
@@ -149,7 +156,7 @@ func (a *App) initRedis() error {
 		return err
 	}
 	a.redis = redisClient
-	log.Println("Redis connection established")
+	slog.Info("Redis connection established")
 	return nil
 }
 
@@ -164,6 +171,7 @@ func (a *App) initServices() {
 		webhookClient,
 		cache,
 		a.config.Webhook.Path,
+		slog.Default(),
 	)
 }
 
@@ -175,7 +183,7 @@ func (a *App) initServer() {
 func (a *App) setupRoutes() http.Handler {
 	mux := http.NewServeMux()
 	handlers.RegisterHealthHandler(mux)
-	handlers.RegisterMessageHandler(mux, a.messageService)
+	handlers.RegisterMessageHandler(mux, a.messageService, slog.Default())
 
 	return middleware.Recovery(mux)
 }
@@ -186,8 +194,11 @@ func (a *App) setupHTTPServer(handler http.Handler) *http.Server {
 	idleTimeout := getTimeoutValue(a.config.App.IdleTimeout, 120)
 	maxHeaderBytes := getHeaderSize(a.config.App.MaxHeaderMB)
 
-	log.Printf("Server configuration: ReadTimeout=%ds, WriteTimeout=%ds, IdleTimeout=%ds, MaxHeaderBytes=%dMB",
-		readTimeout, writeTimeout, idleTimeout, maxHeaderBytes>>20)
+	slog.Info("Server configuration",
+		slog.Int("read_timeout_sec", readTimeout),
+		slog.Int("write_timeout_sec", writeTimeout),
+		slog.Int("idle_timeout_sec", idleTimeout),
+		slog.Int("max_header_mb", maxHeaderBytes>>20))
 
 	return &http.Server{
 		Addr:              fmt.Sprintf(":%d", a.config.App.Port),
@@ -206,19 +217,16 @@ func loadConfig() (*config.Config, error) {
 		env = "dev"
 	}
 
-	// Load base config from file
 	configPath := filepath.Join(".config", fmt.Sprintf("%s.yaml", env))
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		return nil, err
 	}
 
-	// Override database DSN from environment variable
 	if dsn := os.Getenv("DATABASE_DSN"); dsn != "" {
 		cfg.Database.DSN = dsn
 	}
 
-	// Override redis config from environment variables
 	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
 		cfg.Redis.Addr = addr
 	}
@@ -231,15 +239,15 @@ func loadConfig() (*config.Config, error) {
 		}
 	}
 
-	log.Printf("Database DSN: %s", cfg.Database.DSN)
-	log.Printf("Redis config: addr=%s", cfg.Redis.Addr)
+	slog.Info("Database DSN", "dsn", cfg.Database.DSN)
+	slog.Info("Redis config", "addr", cfg.Redis.Addr)
 
 	return cfg, nil
 }
 
 func connectDatabase(cfg *config.Config) (*db.Client, error) {
 	dsn := cfg.Database.DSN
-	log.Printf("Connecting to database with DSN: %s", dsn)
+	slog.Info("Connecting to database", "dsn", dsn)
 	return db.NewDB(dsn), nil
 }
 

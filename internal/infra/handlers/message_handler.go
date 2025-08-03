@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -10,10 +11,12 @@ import (
 
 type MessageHandler struct {
 	service *app.MessageService
+	logger  *slog.Logger
 }
 
 func (h *MessageHandler) StartAutoSending(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.StartAutoSending(); err != nil {
+		h.logger.Error("Failed to start automatic message sending", "error", err)
 		Error(w, r, http.StatusInternalServerError, "Failed to start automatic message sending")
 		return
 	}
@@ -26,6 +29,7 @@ func (h *MessageHandler) StartAutoSending(w http.ResponseWriter, r *http.Request
 
 func (h *MessageHandler) StopAutoSending(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.StopAutoSending(); err != nil {
+		h.logger.Error("Failed to stop automatic message sending", "error", err)
 		Error(w, r, http.StatusInternalServerError, "Failed to stop automatic message sending")
 		return
 	}
@@ -47,6 +51,7 @@ func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 		if l, err := strconv.ParseUint(limitStr, 10, 32); err == nil {
 			limit = uint(l)
 		} else {
+			h.logger.Warn("Invalid limit parameter", "limit", limitStr)
 			Error(w, r, http.StatusBadRequest, "Invalid limit parameter")
 			return
 		}
@@ -56,6 +61,7 @@ func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 		if o, err := strconv.ParseUint(offsetStr, 10, 32); err == nil {
 			offset = uint(o)
 		} else {
+			h.logger.Warn("Invalid offset parameter", "offset", offsetStr)
 			Error(w, r, http.StatusBadRequest, "Invalid offset parameter")
 			return
 		}
@@ -63,6 +69,7 @@ func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 
 	messages, err := h.service.GetSentMessages(r.Context(), limit, offset)
 	if err != nil {
+		h.logger.Error("Failed to retrieve messages", "error", err)
 		Error(w, r, http.StatusInternalServerError, "Failed to retrieve messages")
 		return
 	}
@@ -76,8 +83,11 @@ func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	JSON(w, r, http.StatusOK, response)
 }
 
-func RegisterMessageHandler(mux *http.ServeMux, service *app.MessageService) {
-	h := &MessageHandler{service: service}
+func RegisterMessageHandler(mux *http.ServeMux, service *app.MessageService, logger *slog.Logger) {
+	h := &MessageHandler{
+		service: service,
+		logger:  logger.With(slog.String("component", "message_handler")),
+	}
 
 	mux.HandleFunc("POST /messages/start", h.StartAutoSending)
 	mux.HandleFunc("POST /messages/stop", h.StopAutoSending)

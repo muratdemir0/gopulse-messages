@@ -3,6 +3,7 @@ module github.com/muratdemir0/gopulse-messages
 go 1.24.5
 
 require (
+	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/doug-martin/goqu/v9 v9.19.0
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.4.0

@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/muratdemir0/gopulse-messages/internal/adapters/webhook"
@@ -24,6 +24,7 @@ type MessageService struct {
 	cache         *cache.Cache
 	scheduler     *Scheduler
 	webhookPath   string
+	logger        *slog.Logger
 }
 
 func NewMessageService(
@@ -31,50 +32,52 @@ func NewMessageService(
 	webhookClient *webhook.Client,
 	cache *cache.Cache,
 	webhookPath string,
+	logger *slog.Logger,
 ) *MessageService {
 	service := &MessageService{
 		messageRepo:   messageRepo,
 		webhookClient: webhookClient,
 		cache:         cache,
 		webhookPath:   webhookPath,
+		logger:        logger.With(slog.String("component", "message_service")),
 	}
 
-	service.scheduler = NewScheduler(2*time.Minute, service.processMessages)
+	service.scheduler = NewScheduler(2*time.Minute, service.processMessages, logger)
 
 	return service
 }
 
 func (s *MessageService) StartAutoSending() error {
 	s.scheduler.Start()
-	log.Println("Automatic message sending started")
+	s.logger.Info("Automatic message sending started")
 	return nil
 }
 
 func (s *MessageService) StopAutoSending() error {
 	s.scheduler.Stop()
-	log.Println("Automatic message sending stopped")
+	s.logger.Info("Automatic message sending stopped")
 	return nil
 }
 
 func (s *MessageService) processMessages(ctx context.Context) error {
 	messages, err := s.messageRepo.FindDue(ctx, 2)
 	if err != nil {
-		log.Printf("Error finding due messages: %v", err)
+		s.logger.Error("Error finding due messages", "error", err)
 		return err
 	}
 
 	if len(messages) == 0 {
-		log.Println("No pending messages to process")
+		s.logger.Info("No pending messages to process")
 		return nil
 	}
 
-	log.Printf("Processing %d messages", len(messages))
+	s.logger.Info("Processing messages", "count", len(messages))
 
 	for _, message := range messages {
 		if err := s.processMessage(ctx, message); err != nil {
-			log.Printf("Error sending message ID %d: %v", message.ID, err)
+			s.logger.Error("Error sending message", "message_id", message.ID, "error", err)
 			if err := s.messageRepo.IncrementRetry(ctx, message.ID, time.Now()); err != nil {
-				log.Printf("Error incrementing retry for message ID %d: %v", message.ID, err)
+				s.logger.Error("Error incrementing retry for message", "message_id", message.ID, "error", err)
 			}
 		}
 	}
@@ -110,7 +113,7 @@ func (s *MessageService) handleSendFailure(ctx context.Context, message domain.M
 	updatedMessage.ErrorMessage = sql.NullString{String: sendErr.Error(), Valid: true}
 
 	if updateErr := s.messageRepo.Update(ctx, updatedMessage); updateErr != nil {
-		log.Printf("Error updating failed message ID %d: %v", message.ID, updateErr)
+		s.logger.Error("Error updating failed message", "message_id", message.ID, "error", updateErr)
 	}
 
 	return fmt.Errorf("webhook send failed: %w", sendErr)
@@ -124,7 +127,7 @@ func (s *MessageService) handleSendSuccess(ctx context.Context, message domain.M
 	}
 
 	s.cacheMessageResult(ctx, message.ID, resp.MessageID, now)
-	log.Printf("Successfully sent message ID %d to %s", message.ID, message.Recipient)
+	s.logger.Info("Successfully sent message", "message_id", message.ID, "recipient", message.Recipient)
 
 	return nil
 }
@@ -136,7 +139,7 @@ func (s *MessageService) updateMessageAsSuccessful(ctx context.Context, message 
 	updatedMessage.ResponseID = sql.NullString{String: resp.MessageID, Valid: true}
 
 	if err := s.messageRepo.Update(ctx, updatedMessage); err != nil {
-		log.Printf("Error updating sent message ID %d: %v", message.ID, err)
+		s.logger.Error("Error updating sent message", "message_id", message.ID, "error", err)
 		return fmt.Errorf("failed to update message status: %w", err)
 	}
 
@@ -153,12 +156,12 @@ func (s *MessageService) cacheMessageResult(ctx context.Context, messageID int64
 
 	cacheData, err := json.Marshal(data)
 	if err != nil {
-		log.Printf("Error marshaling cache data for message ID %d: %v", messageID, err)
+		s.logger.Error("Error marshaling cache data for message", "message_id", messageID, "error", err)
 		return
 	}
 
 	if err := s.cache.Set(ctx, cacheKey, string(cacheData)); err != nil {
-		log.Printf("Error caching message ID %d: %v", messageID, err)
+		s.logger.Error("Error caching message", "message_id", messageID, "error", err)
 	}
 }
 
