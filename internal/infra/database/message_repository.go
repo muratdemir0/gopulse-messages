@@ -117,3 +117,20 @@ func (r *MessageRepository) ListByStatus(ctx context.Context, status string, lim
 	}
 	return messages, nil
 }
+
+func (r *MessageRepository) Create(ctx context.Context, message *domain.Message) error {
+	record := goqu.Record{
+		"recipient": message.Recipient,
+		"content":   message.Content,
+		"status":    message.Status,
+	}
+
+	ds := goqu.Insert(tableName).Rows(record)
+
+	_, err := r.db.Insert(ctx, ds)
+	if err != nil {
+		return fmt.Errorf("error creating message: %w", err)
+	}
+
+	return nil
+}

@@ -12,12 +12,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-faker/faker/v4"
 	"github.com/muratdemir0/gopulse-messages/internal/adapters/db"
 	"github.com/muratdemir0/gopulse-messages/internal/adapters/ohttp"
 	"github.com/muratdemir0/gopulse-messages/internal/adapters/redis"
 	"github.com/muratdemir0/gopulse-messages/internal/adapters/webhook"
 	"github.com/muratdemir0/gopulse-messages/internal/app"
 	"github.com/muratdemir0/gopulse-messages/internal/config"
+	"github.com/muratdemir0/gopulse-messages/internal/domain"
 	"github.com/muratdemir0/gopulse-messages/internal/infra/cache"
 	"github.com/muratdemir0/gopulse-messages/internal/infra/database"
 	"github.com/muratdemir0/gopulse-messages/internal/infra/handlers"
@@ -26,11 +28,12 @@ import (
 )
 
 type App struct {
-	config         *config.Config
-	db             *db.Client
-	redis          *redisclient.Client
-	messageService *app.MessageService
-	server         *http.Server
+	config            *config.Config
+	db                *db.Client
+	redis             *redisclient.Client
+	messageService    *app.MessageService
+	server            *http.Server
+	randomMessageRepo *database.MessageRepository
 }
 
 func main() {
@@ -96,6 +99,8 @@ func (a *App) Start() error {
 	} else {
 		slog.Info("Automatic message sending started")
 	}
+
+	go a.startProducing(context.Background())
 
 	slog.Info("Server starting", "port", a.config.App.Port)
 	return a.server.ListenAndServe()
@@ -184,6 +189,8 @@ func (a *App) initServices() {
 		a.config.Webhook.Path,
 		slog.Default(),
 	)
+
+	a.randomMessageRepo = messageRepo
 }
 
 func (a *App) initServer() {
@@ -282,4 +289,41 @@ func getHeaderSize(maxHeaderMB int) int {
 		return maxHeaderMB << 20
 	}
 	return 1 << 20 // 1 MB default
+}
+
+type FakeMessage struct {
+	Recipient string `faker:"phone_number"`
+	Content   string `faker:"sentence"`
+}
+
+func (a *App) startProducing(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			var fakeMsg FakeMessage
+			err := faker.FakeData(&fakeMsg)
+			if err != nil {
+				slog.Error("failed to generate fake data", "error", err)
+				continue
+			}
+
+			message := &domain.Message{
+				Recipient: fakeMsg.Recipient,
+				Content:   fakeMsg.Content,
+				Status:    "pending",
+			}
+
+			if err := a.randomMessageRepo.Create(ctx, message); err != nil {
+				slog.Error("failed to create message", "error", err)
+			} else {
+				slog.Info("Successfully created a new message")
+			}
+		case <-ctx.Done():
+			slog.Info("Stopping producer...")
+			return
+		}
+	}
 }
