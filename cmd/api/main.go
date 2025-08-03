@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -205,15 +206,40 @@ func loadConfig() (*config.Config, error) {
 		env = "dev"
 	}
 
+	// Load base config from file
 	configPath := filepath.Join(".config", fmt.Sprintf("%s.yaml", env))
-	return config.Load(configPath)
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Override database DSN from environment variable
+	if dsn := os.Getenv("DATABASE_DSN"); dsn != "" {
+		cfg.Database.DSN = dsn
+	}
+
+	// Override redis config from environment variables
+	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
+		cfg.Redis.Addr = addr
+	}
+	if password := os.Getenv("REDIS_PASSWORD"); password != "" {
+		cfg.Redis.Password = password
+	}
+	if db := os.Getenv("REDIS_DB"); db != "" {
+		if d, err := strconv.Atoi(db); err == nil {
+			cfg.Redis.DB = d
+		}
+	}
+
+	log.Printf("Database DSN: %s", cfg.Database.DSN)
+	log.Printf("Redis config: addr=%s", cfg.Redis.Addr)
+
+	return cfg, nil
 }
 
 func connectDatabase(cfg *config.Config) (*db.Client, error) {
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		cfg.Database.Host, cfg.Database.Port, cfg.Database.User,
-		cfg.Database.Password, cfg.Database.DBName, cfg.Database.SSLMode)
-
+	dsn := cfg.Database.DSN
+	log.Printf("Connecting to database with DSN: %s", dsn)
 	return db.NewDB(dsn), nil
 }
 

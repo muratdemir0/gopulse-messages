@@ -9,10 +9,10 @@ import (
 type App struct {
 	Name         string `mapstructure:"name"`
 	Port         int    `mapstructure:"port"`
-	ReadTimeout  int    `mapstructure:"read_timeout"`  
-	WriteTimeout int    `mapstructure:"write_timeout"` 
-	IdleTimeout  int    `mapstructure:"idle_timeout"`  
-	MaxHeaderMB  int    `mapstructure:"max_header_mb"` 
+	ReadTimeout  int    `mapstructure:"read_timeout"`
+	WriteTimeout int    `mapstructure:"write_timeout"`
+	IdleTimeout  int    `mapstructure:"idle_timeout"`
+	MaxHeaderMB  int    `mapstructure:"max_header_mb"`
 }
 
 type Webhook struct {
@@ -27,12 +27,7 @@ type Redis struct {
 }
 
 type Database struct {
-	Host     string `mapstructure:"host"`
-	Port     int    `mapstructure:"port"`
-	User     string `mapstructure:"user"`
-	Password string `mapstructure:"password"`
-	DBName   string `mapstructure:"dbname"`
-	SSLMode  string `mapstructure:"sslmode"`
+	DSN string `mapstructure:"dsn"`
 }
 
 type Config struct {
@@ -46,6 +41,7 @@ func Load(path string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigFile(path)
 	v.SetConfigType("yaml")
+	v.AutomaticEnv()
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)

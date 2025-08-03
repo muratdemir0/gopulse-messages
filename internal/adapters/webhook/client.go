@@ -37,7 +37,9 @@ func (c *Client) Send(ctx context.Context, message Request, path string) (*Respo
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Host+path, bytes.NewBuffer(payload))
+	fullUrl := fmt.Sprintf("%s/%s", c.Host, path)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullUrl, bytes.NewBuffer(payload))
 	if err != nil {
 		return nil, err
 	}
