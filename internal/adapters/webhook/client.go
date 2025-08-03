@@ -5,9 +5,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/muratdemir0/gopulse-messages/internal/adapters/ohttp"
 	"net/http"
+
+	"github.com/muratdemir0/gopulse-messages/internal/adapters/ohttp"
 )
+
+type HTTPError struct {
+	StatusCode int
+	URL        string
+}
+
+// Error implements the error interface.
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("unexpected status code: %d for %s", e.StatusCode, e.URL)
+}
 
 type Client struct {
 	Host       string
@@ -51,7 +62,7 @@ func (c *Client) Send(ctx context.Context, message Request, path string) (*Respo
 	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return nil, &HTTPError{StatusCode: resp.StatusCode, URL: fullUrl}
 	}
 
 	var response Response

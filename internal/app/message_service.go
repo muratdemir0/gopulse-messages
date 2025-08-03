@@ -4,13 +4,25 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/muratdemir0/gopulse-messages/internal/adapters/webhook"
 	"github.com/muratdemir0/gopulse-messages/internal/domain"
 	"github.com/muratdemir0/gopulse-messages/internal/infra/cache"
+)
+
+const (
+	DefaultInitialInterval     = 10 * time.Second
+	DefaultRandomizationFactor = 0.5
+	DefaultMultiplier          = 1.5
+	DefaultMaxInterval         = 10 * time.Second
+	DefaultMaxElapsedTime      = 10 * time.Second
+	DefaultMaxRetries          = 5
 )
 
 type messageCacheData struct {
@@ -104,7 +116,39 @@ func (s *MessageService) buildWebhookRequest(message domain.Message) webhook.Req
 }
 
 func (s *MessageService) sendWebhookRequest(ctx context.Context, req webhook.Request) (*webhook.Response, error) {
-	return s.webhookClient.Send(ctx, req, s.webhookPath)
+	var resp *webhook.Response
+
+	operation := func() error {
+		r, err := s.webhookClient.Send(ctx, req, s.webhookPath)
+		if err != nil {
+			var httpErr *webhook.HTTPError
+			if errors.As(err, &httpErr) {
+				if httpErr.StatusCode >= http.StatusBadRequest && httpErr.StatusCode < http.StatusInternalServerError {
+					return backoff.Permanent(err)
+				}
+			}
+			return err
+		}
+		resp = r
+		return nil
+	}
+
+	bo := backoff.NewExponentialBackOff()
+	bo.InitialInterval = DefaultInitialInterval
+	bo.RandomizationFactor = DefaultRandomizationFactor
+	bo.Multiplier = DefaultMultiplier
+	bo.MaxInterval = DefaultMaxInterval
+	bo.MaxElapsedTime = DefaultMaxElapsedTime
+
+	b := backoff.WithMaxRetries(bo, DefaultMaxRetries)
+
+	err := backoff.Retry(operation, backoff.WithContext(b, ctx))
+
+	if err != nil {
+		return nil, fmt.Errorf("webhook send failed after retries: %w", err)
+	}
+
+	return resp, nil
 }
 
 func (s *MessageService) handleSendFailure(ctx context.Context, message domain.Message, sendErr error) error {
