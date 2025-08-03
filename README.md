@@ -67,6 +67,24 @@ TELEMETRY_ENABLED=true
 - **Jaeger UI**: http://localhost:16686 - Request tracing, performance monitoring
 - **Health Endpoint**: http://localhost:8080/health - Sistem durumu
 
+### 🚧 APM Eksikleri (TODO)
+
+- [ ] **Custom Instrumentation**: Business logic için custom span'lar eklenmeli
+- [ ] **Error Tracking**: Structured error logging ve alerting eksik
+- [ ] **Performance Dashboards**: Dashboard yapılmadı
+- [ ] **Alert Rules**: Critical metric'ler için alert rule'ları eksik
+
+## 🚀 CI/CD Pipeline
+
+Mevcut pipeline Docker build, security scan ve deployment içeriyor.
+
+### 🚧 Pipeline Eksikleri (TODO)
+
+- [ ] **Code Coverage**: Test coverage reporting ve gate eksik
+- [ ] **Performance Testing**: Load testing ve benchmark'lar eksik
+- [ ] **Quality Gates**: SonarQube integration eksik
+- [ ] **Dependency Updates**: Automated dependency bump'ları eksik
+- [ ] **Container Registry**: Private registry setup eksik
 
 ## 📋 Gereksinimler
 
