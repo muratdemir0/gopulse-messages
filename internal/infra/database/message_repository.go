@@ -16,6 +16,10 @@ const (
 	maxRetryCount = 5
 )
 
+var (
+	ErrMessageNotFound = fmt.Errorf("message not found or not in pending state")
+)
+
 type MessageRepository struct {
 	db *db.Client
 }
@@ -25,14 +29,13 @@ func NewMessageRepository(db *db.Client) *MessageRepository {
 }
 
 func (r *MessageRepository) Update(ctx context.Context, message domain.Message) error {
-	updatedAt := sql.NullTime{
-		Time:  time.Now(),
-		Valid: true,
-	}
-
 	record := goqu.Record{
-		"status":     message.Status,
-		"updated_at": updatedAt,
+		"status":        message.Status,
+		"sent_at":       message.SentAt,
+		"response_id":   message.ResponseID,
+		"error_message": message.ErrorMessage,
+		"retry_count":   message.RetryCount,
+		"updated_at":    sql.NullTime{Time: time.Now(), Valid: true},
 	}
 
 	ds := goqu.Update(tableName).
@@ -49,7 +52,7 @@ func (r *MessageRepository) Update(ctx context.Context, message domain.Message) 
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		return domain.ErrMessageNotFound
+		return ErrMessageNotFound
 	}
 
 	return nil
@@ -88,8 +91,7 @@ func (r *MessageRepository) IncrementRetry(ctx context.Context, id int64, attemp
 	ds := goqu.Update(tableName).
 		Set(
 			goqu.Record{
-				"last_attempt_at": attemptTime,
-				"retry_count":     goqu.L("retry_count + 1"),
+				"retry_count": goqu.L("retry_count + 1"),
 			},
 		).
 		Where(goqu.Ex{"id": id})

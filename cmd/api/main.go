@@ -161,7 +161,18 @@ func (a *App) initRedis() error {
 }
 
 func (a *App) initServices() {
-	httpClient := ohttp.NewClient()
+	clientConfig := ohttp.Config{
+		RetryConfig: &ohttp.RetryConfig{
+			MaxRetries:          3,
+			InitialInterval:     100 * time.Millisecond,
+			RandomizationFactor: 0.5,
+			Multiplier:          2,
+			MaxInterval:         10 * time.Second,
+			MaxElapsedTime:      15 * time.Second,
+		},
+	}
+
+	httpClient := ohttp.NewClient(clientConfig)
 	webhookClient := webhook.NewClient(a.config.Webhook.Host, httpClient)
 	cache := cache.NewCache(a.redis, 24*time.Hour)
 	messageRepo := database.NewMessageRepository(a.db)

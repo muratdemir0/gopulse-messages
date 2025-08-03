@@ -18,7 +18,7 @@ func TestClientDo(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := ohttp.NewClient(ohttp.DefaultTransport())
+	client := ohttp.NewClient()
 	req, err := http.NewRequest("PUT", server.URL, nil)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)

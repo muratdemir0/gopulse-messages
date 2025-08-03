@@ -4,25 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
 	"github.com/muratdemir0/gopulse-messages/internal/adapters/webhook"
 	"github.com/muratdemir0/gopulse-messages/internal/domain"
 	"github.com/muratdemir0/gopulse-messages/internal/infra/cache"
-)
-
-const (
-	DefaultInitialInterval     = 10 * time.Second
-	DefaultRandomizationFactor = 0.5
-	DefaultMultiplier          = 1.5
-	DefaultMaxInterval         = 10 * time.Second
-	DefaultMaxElapsedTime      = 10 * time.Second
-	DefaultMaxRetries          = 5
 )
 
 type messageCacheData struct {
@@ -100,7 +88,7 @@ func (s *MessageService) processMessages(ctx context.Context) error {
 func (s *MessageService) processMessage(ctx context.Context, message domain.Message) error {
 	webhookReq := s.buildWebhookRequest(message)
 
-	resp, err := s.sendWebhookRequest(ctx, webhookReq)
+	resp, err := s.webhookClient.Send(ctx, webhookReq, s.webhookPath)
 	if err != nil {
 		return s.handleSendFailure(ctx, message, err)
 	}
@@ -113,42 +101,6 @@ func (s *MessageService) buildWebhookRequest(message domain.Message) webhook.Req
 		To:      message.Recipient,
 		Content: message.Content,
 	}
-}
-
-func (s *MessageService) sendWebhookRequest(ctx context.Context, req webhook.Request) (*webhook.Response, error) {
-	var resp *webhook.Response
-
-	operation := func() error {
-		r, err := s.webhookClient.Send(ctx, req, s.webhookPath)
-		if err != nil {
-			var httpErr *webhook.HTTPError
-			if errors.As(err, &httpErr) {
-				if httpErr.StatusCode >= http.StatusBadRequest && httpErr.StatusCode < http.StatusInternalServerError {
-					return backoff.Permanent(err)
-				}
-			}
-			return err
-		}
-		resp = r
-		return nil
-	}
-
-	bo := backoff.NewExponentialBackOff()
-	bo.InitialInterval = DefaultInitialInterval
-	bo.RandomizationFactor = DefaultRandomizationFactor
-	bo.Multiplier = DefaultMultiplier
-	bo.MaxInterval = DefaultMaxInterval
-	bo.MaxElapsedTime = DefaultMaxElapsedTime
-
-	b := backoff.WithMaxRetries(bo, DefaultMaxRetries)
-
-	err := backoff.Retry(operation, backoff.WithContext(b, ctx))
-
-	if err != nil {
-		return nil, fmt.Errorf("webhook send failed after retries: %w", err)
-	}
-
-	return resp, nil
 }
 
 func (s *MessageService) handleSendFailure(ctx context.Context, message domain.Message, sendErr error) error {
@@ -166,13 +118,16 @@ func (s *MessageService) handleSendFailure(ctx context.Context, message domain.M
 func (s *MessageService) handleSendSuccess(ctx context.Context, message domain.Message, resp *webhook.Response) error {
 	now := time.Now()
 
+	s.logger.Info("Successfully sent message",
+		"message_id", message.ID,
+		"recipient", message.Recipient,
+		"attempt", resp.RetryAttempt)
+
 	if err := s.updateMessageAsSuccessful(ctx, message, resp, now); err != nil {
 		return err
 	}
 
 	s.cacheMessageResult(ctx, message.ID, resp.MessageID, now)
-	s.logger.Info("Successfully sent message", "message_id", message.ID, "recipient", message.Recipient)
-
 	return nil
 }
 
@@ -181,6 +136,7 @@ func (s *MessageService) updateMessageAsSuccessful(ctx context.Context, message 
 	updatedMessage.Status = domain.MessageStatusSent
 	updatedMessage.SentAt = sql.NullTime{Time: sentAt, Valid: true}
 	updatedMessage.ResponseID = sql.NullString{String: resp.MessageID, Valid: true}
+	updatedMessage.RetryCount = resp.RetryAttempt
 
 	if err := s.messageRepo.Update(ctx, updatedMessage); err != nil {
 		s.logger.Error("Error updating sent message", "message_id", message.ID, "error", err)

@@ -6,19 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
+	"strconv"
 	"github.com/muratdemir0/gopulse-messages/internal/adapters/ohttp"
 )
-
-type HTTPError struct {
-	StatusCode int
-	URL        string
-}
-
-// Error implements the error interface.
-func (e *HTTPError) Error() string {
-	return fmt.Sprintf("unexpected status code: %d for %s", e.StatusCode, e.URL)
-}
 
 type Client struct {
 	Host       string
@@ -26,8 +16,9 @@ type Client struct {
 }
 
 type Response struct {
-	Message   string `json:"message"`
-	MessageID string `json:"messageId"`
+	Message      string `json:"message"`
+	MessageID    string `json:"messageId"`
+	RetryAttempt int    `json:"-"`
 }
 
 type Request struct {
@@ -62,11 +53,16 @@ func (c *Client) Send(ctx context.Context, message Request, path string) (*Respo
 	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, &HTTPError{StatusCode: resp.StatusCode, URL: fullUrl}
+		return nil, fmt.Errorf("unexpected status code: %d for %s", resp.StatusCode, fullUrl)
 	}
 
 	var response Response
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, err
+	}
+
+	response.RetryAttempt, err = strconv.Atoi(resp.Header.Get(ohttp.HeaderRetryAttempt))
+	if err != nil {
 		return nil, err
 	}
 

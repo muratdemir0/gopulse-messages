@@ -3,12 +3,7 @@ package domain
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"time"
-)
-
-var (
-	ErrMessageNotFound = errors.New("message not found")
 )
 
 type MessageStatus string
