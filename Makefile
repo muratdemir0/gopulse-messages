@@ -1,4 +1,4 @@
-DB_DSN?=postgres://postgres:postgres@localhost:5432/gopulse?sslmode=disable
+DB_DSN?=postgres://postgres:postgres@localhost:5432/gopulse_messages?sslmode=disable
 
 unit-test:
 	go test -v -tags=unit ./...
