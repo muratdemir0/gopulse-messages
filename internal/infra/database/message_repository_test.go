@@ -1,3 +1,5 @@
+//go:build integration
+
 package database_test
 
 import (
@@ -203,4 +205,32 @@ func TestMessageRepository_ListByStatus(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, messages, 1)
 	})
+}
+
+func TestMessageRepository_Create(t *testing.T) {
+	defer cleanup(t)
+	ctx := context.Background()
+
+	msg := &domain.Message{
+		Recipient: "1234567890",
+		Content:   "Hello, Create!",
+		Status:    domain.MessageStatusPending,
+	}
+
+	err := messageRepo.Create(ctx, msg)
+	assert.NoError(t, err)
+
+	var createdMsg domain.Message
+	_, err = dbClient.Goqu.From("messages").
+		Where(
+			goqu.C("recipient").Eq(msg.Recipient),
+			goqu.C("content").Eq(msg.Content),
+		).ScanStructContext(ctx, &createdMsg)
+
+	assert.NoError(t, err)
+	assert.Equal(t, msg.Recipient, createdMsg.Recipient)
+	assert.Equal(t, msg.Content, createdMsg.Content)
+	assert.Equal(t, msg.Status, createdMsg.Status)
+	assert.NotZero(t, createdMsg.ID)
+	assert.False(t, createdMsg.CreatedAt.IsZero())
 }
