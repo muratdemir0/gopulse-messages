@@ -211,7 +211,6 @@ func (a *App) setupRoutes() http.Handler {
 	handlers.RegisterHealthHandler(mux)
 	handlers.RegisterMessageHandler(mux, a.messageService, slog.Default())
 
-	// Add swagger
 	handler := httpSwagger.Handler(
 		httpSwagger.URL(fmt.Sprintf("http://localhost:%d/swagger/doc.json", a.config.App.Port)),
 	)

@@ -20,7 +20,6 @@ func NewCache(client *redis.Client, ttl time.Duration) *Cache {
 	}
 }
 
-// Set stores data in Redis with TTL
 func (s *Cache) Set(ctx context.Context, key string, value interface{}) error {
 	err := s.client.Set(ctx, key, value, s.ttl).Err()
 	if err != nil {
@@ -29,7 +28,6 @@ func (s *Cache) Set(ctx context.Context, key string, value interface{}) error {
 	return nil
 }
 
-// Get retrieves data from Redis
 func (s *Cache) Get(ctx context.Context, key string) (string, error) {
 	data, err := s.client.Get(ctx, key).Result()
 	if err != nil {
@@ -41,7 +39,6 @@ func (s *Cache) Get(ctx context.Context, key string) (string, error) {
 	return data, nil
 }
 
-// Exists checks if a key exists in Redis
 func (s *Cache) Exists(ctx context.Context, key string) (bool, error) {
 	count, err := s.client.Exists(ctx, key).Result()
 	if err != nil {
@@ -50,7 +47,6 @@ func (s *Cache) Exists(ctx context.Context, key string) (bool, error) {
 	return count > 0, nil
 }
 
-// Delete removes a key from Redis
 func (s *Cache) Delete(ctx context.Context, key string) error {
 	err := s.client.Del(ctx, key).Err()
 	if err != nil {
