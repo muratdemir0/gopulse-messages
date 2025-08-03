@@ -311,7 +311,7 @@ type FakeMessage struct {
 }
 
 func (a *App) startProducing(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	for {

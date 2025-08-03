@@ -4,7 +4,7 @@ GoPulse Messages, otomatik mesaj gönderim sistemi için geliştirilmiş bir Go 
 
 ## 🚀 Özellikler
 
-- **Otomatik Veri Üretimi**: 5 saniyede bir fake mesaj verisi üreten background producer
+- **Otomatik Veri Üretimi**: 30 saniyede bir fake mesaj verisi üreten background producer
 - **Otomatik Mesaj Gönderimi**: 2 dakikalık aralıklarla çalışan background scheduler
 - **Webhook Entegrasyonu**: Mesajları harici servislere webhook ile gönderme
 - **Redis Cache**: Gönderilen mesajların cache'lenmesi
@@ -21,7 +21,7 @@ GoPulse Messages, otomatik mesaj gönderim sistemi için geliştirilmiş bir Go 
 GoPulse Messages uygulaması başladığında 2 background process otomatik olarak çalışmaya başlar:
 
 ### 1. Data Producer (Veri Üretici)
-- **Sıklık**: 5 saniyede bir
+- **Sıklık**: 30 saniyede bir
 - **Görev**: Fake mesaj verisi üretir
 - **Veri Türü**: Rastgele telefon numarası + mesaj içeriği
 - **Durum**: Mesajlar "pending" status'unda veritabanına kaydedilir
@@ -88,7 +88,7 @@ docker-compose down
 Uygulama başladıktan sonra data producer'ın çalıştığını görmek için:
 
 ```bash
-# Data producer loglarını takip edin (5 saniyede bir mesaj üretir)
+# Data producer loglarını takip edin (30 saniyede bir mesaj üretir)
 docker-compose logs -f server | grep "Successfully created a new message"
 
 # Message scheduler loglarını takip edin (2 dakikada bir gönderim)
