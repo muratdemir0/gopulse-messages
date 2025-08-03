@@ -1,0 +1,146 @@
+basePath: /
+definitions:
+  handlers.ErrorResponse:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+      path:
+        type: string
+      status:
+        type: integer
+    type: object
+  rest.MessageResponse:
+    properties:
+      content:
+        type: string
+      createdAt:
+        type: string
+      errorMessage:
+        type: string
+      id:
+        type: integer
+      lastAttemptAt:
+        type: string
+      recipient:
+        type: string
+      responseCode:
+        type: integer
+      responseId:
+        type: string
+      retryCount:
+        type: integer
+      sentAt:
+        type: string
+      status:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  rest.MessagesListResponse:
+    properties:
+      count:
+        type: integer
+      messages:
+        items:
+          $ref: '#/definitions/rest.MessageResponse'
+        type: array
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: GoPulse Messages API
+  title: GoPulse Messages API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Check if the service is up and running.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"status": "ok"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health Check
+      tags:
+      - health
+  /messages:
+    get:
+      description: Retrieves a list of sent messages with optional pagination.
+      parameters:
+      - default: 10
+        description: Number of messages to return
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/rest.MessagesListResponse'
+        "400":
+          description: Invalid limit or offset parameter
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Failed to retrieve messages
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Get sent messages
+      tags:
+      - messages
+  /messages/start:
+    post:
+      consumes:
+      - application/json
+      description: Starts the background job that automatically sends messages.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: Automatic message sending started, status: active'
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Failed to start automatic message sending
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Start automatic message sending
+      tags:
+      - messages
+  /messages/stop:
+    post:
+      consumes:
+      - application/json
+      description: Stops the background job that automatically sends messages.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: Automatic message sending stopped, status: inactive'
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Failed to stop automatic message sending
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Stop automatic message sending
+      tags:
+      - messages
+swagger: "2.0"

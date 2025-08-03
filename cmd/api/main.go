@@ -13,6 +13,9 @@ import (
 	"time"
 
 	"github.com/go-faker/faker/v4"
+	httpSwagger "github.com/swaggo/http-swagger"
+
+	_ "github.com/muratdemir0/gopulse-messages/docs"
 	"github.com/muratdemir0/gopulse-messages/internal/adapters/db"
 	"github.com/muratdemir0/gopulse-messages/internal/adapters/ohttp"
 	"github.com/muratdemir0/gopulse-messages/internal/adapters/redis"
@@ -36,6 +39,11 @@ type App struct {
 	randomMessageRepo *database.MessageRepository
 }
 
+// @title       GoPulse Messages API
+// @version     1.0
+// @description GoPulse Messages API
+// @host        localhost:8080
+// @BasePath    /
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -202,6 +210,13 @@ func (a *App) setupRoutes() http.Handler {
 	mux := http.NewServeMux()
 	handlers.RegisterHealthHandler(mux)
 	handlers.RegisterMessageHandler(mux, a.messageService, slog.Default())
+
+	// Add swagger
+	handler := httpSwagger.Handler(
+		httpSwagger.URL("http://localhost:8080/swagger/doc.json"), // Spec’lerin URL’i
+		// httpSwagger.DocExpansion("none"), // isteğe bağlı daha fazla config
+	)
+	mux.Handle("/swagger/", handler)
 
 	return middleware.Recovery(mux)
 }

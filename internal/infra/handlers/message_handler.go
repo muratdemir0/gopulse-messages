@@ -14,6 +14,15 @@ type MessageHandler struct {
 	logger  *slog.Logger
 }
 
+// StartAutoSending godoc
+// @Summary Start automatic message sending
+// @Description Starts the background job that automatically sends messages.
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "message: Automatic message sending started, status: active"
+// @Failure 500 {object} ErrorResponse "Failed to start automatic message sending"
+// @Router /messages/start [post]
 func (h *MessageHandler) StartAutoSending(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.StartAutoSending(); err != nil {
 		h.logger.Error("Failed to start automatic message sending", "error", err)
@@ -27,6 +36,15 @@ func (h *MessageHandler) StartAutoSending(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// StopAutoSending godoc
+// @Summary Stop automatic message sending
+// @Description Stops the background job that automatically sends messages.
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "message: Automatic message sending stopped, status: inactive"
+// @Failure 500 {object} ErrorResponse "Failed to stop automatic message sending"
+// @Router /messages/stop [post]
 func (h *MessageHandler) StopAutoSending(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.StopAutoSending(); err != nil {
 		h.logger.Error("Failed to stop automatic message sending", "error", err)
@@ -40,6 +58,17 @@ func (h *MessageHandler) StopAutoSending(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// GetMessages godoc
+// @Summary Get sent messages
+// @Description Retrieves a list of sent messages with optional pagination.
+// @Tags messages
+// @Produce json
+// @Param limit query int false "Number of messages to return" default(10)
+// @Param offset query int false "Offset for pagination" default(0)
+// @Success 200 {object} rest.MessagesListResponse
+// @Failure 400 {object} ErrorResponse "Invalid limit or offset parameter"
+// @Failure 500 {object} ErrorResponse "Failed to retrieve messages"
+// @Router /messages [get]
 func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
