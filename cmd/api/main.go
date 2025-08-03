@@ -221,6 +221,7 @@ func (a *App) initServices() {
 			MaxInterval:         10 * time.Second,
 			MaxElapsedTime:      15 * time.Second,
 		},
+		EnableOpenTelemetry: a.config.Telemetry.Enabled,
 	}
 
 	httpClient := ohttp.NewClient(clientConfig)
@@ -254,7 +255,7 @@ func (a *App) setupRoutes() http.Handler {
 	)
 	mux.Handle("/swagger/", handler)
 
-	
+
 	wrappedHandler := middleware.Recovery(mux)
 
 	if a.config.Telemetry.Enabled && a.tracerProvider != nil {

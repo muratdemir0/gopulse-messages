@@ -15,6 +15,7 @@ GoPulse Messages, otomatik mesaj gönderim sistemi için geliştirilmiş bir Go 
 - **Docker Desteği**: Container tabanlı deployment
 - **Health Check**: Sistem durumu kontrolü
 - **Graceful Shutdown**: Güvenli uygulama kapanışı
+- **APM & Monitoring**: Jaeger ile distributed tracing ve performance monitoring
 
 ## 🔄 Sistem Nasıl Çalışır
 
@@ -69,6 +70,7 @@ Bu komut aşağıdaki servisleri başlatır:
 - `server`: GoPulse Messages API
 - `db`: PostgreSQL veritabanı
 - `redis`: Redis cache
+- `jaeger`: Jaeger APM ve distributed tracing
 
 ### Servisler
 
@@ -76,6 +78,7 @@ Bu komut aşağıdaki servisleri başlatır:
 - **PostgreSQL**: localhost:5433
 - **Redis**: localhost:6379
 - **Swagger UI**: http://localhost:8080/swagger/
+- **Jaeger UI**: http://localhost:16686
 
 ### 3. Servisleri Durdurma
 
@@ -96,6 +99,9 @@ docker-compose logs -f server | grep "message sent"
 
 # Gönderilen mesajları API ile kontrol edin
 curl "http://localhost:8080/messages?limit=5"
+
+# Jaeger UI'da trace'leri inceleyin
+open http://localhost:16686
 ```
 
 ### 5. Webhook Konfigürasyonu (Opsiyonel)
@@ -120,6 +126,8 @@ Docker Compose varsayılan ayarlarla yeterlidir. İhtiyacınız varsa şu enviro
 - `REDIS_DB`: Redis database numarası
 - `WEBHOOK_HOST`: Webhook host adresi
 - `WEBHOOK_PATH`: Webhook endpoint path
+- `TELEMETRY_ENABLED`: APM telemetry aktif/pasif (true/false)
+- `TELEMETRY_OTLP_ENDPOINT`: OpenTelemetry OTLP endpoint
 
 ## 📖 API Dokümantasyonu
 
@@ -243,8 +251,102 @@ export REDIS_ADDR="your_production_redis_address"
 export REDIS_PASSWORD="your_production_redis_password"
 export WEBHOOK_HOST="your_production_webhook_host"
 export WEBHOOK_PATH="your_production_webhook_path"
+export TELEMETRY_ENABLED="true"
+export TELEMETRY_OTLP_ENDPOINT="your_jaeger_endpoint:4317"
 ```
 
+## 📊 APM & Monitoring
+
+GoPulse Messages, Jaeger APM sistemi ile kapsamlı monitoring ve distributed tracing özelliklerine sahiptir.
+
+### 🔍 Jaeger Distributed Tracing
+
+#### Özellikler
+- **HTTP Request Tracing**: Tüm API çağrıları otomatik olarak trace'lenir
+- **Database Operations**: Veritabanı sorguları ve performansları izlenir
+- **External API Calls**: Webhook çağrıları ve HTTP client işlemleri trace'lenir
+- **Background Processes**: Message scheduler ve data producer işlemleri izlenir
+- **Error Tracking**: Hata durumları ve stack trace'ler kaydedilir
+
+#### Jaeger UI Kullanımı
+
+1. **Erişim**: http://localhost:16686
+2. **Service Selection**: Dropdown'dan `gopulse-messages` servisini seçin
+3. **Operation Filter**: İzlemek istediğiniz operasyonu seçin (örn: `POST /messages/start`)
+4. **Time Range**: İncelemek istediğiniz zaman aralığını belirleyin
+5. **Find Traces**: "Find Traces" butonuna tıklayın
+
+#### Trace Analizi
+
+**Performance Monitoring:**
+- Request latency ve response time'ları
+- Database query execution time
+- External API call durations
+- Background job processing times
+
+**Error Investigation:**
+- Failed requests ve error stack traces
+- Retry attempts ve failure patterns
+- Service dependencies ve bottleneck'ler
+
+### 📈 Telemetry Configuration
+
+#### Varsayılan Ayarlar (Docker Compose)
+```yaml
+environment:
+  - TELEMETRY_ENABLED=true
+  - TELEMETRY_OTLP_ENDPOINT=jaeger:4317
+```
+
+#### Production Ayarları
+```bash
+# Telemetry'yi aktif et
+export TELEMETRY_ENABLED=true
+
+# External Jaeger endpoint
+export TELEMETRY_OTLP_ENDPOINT=your-jaeger-collector:4317
+
+# Service name (default: gopulse-messages)
+export TELEMETRY_SERVICE_NAME=gopulse-messages-prod
+```
+
+#### Telemetry'yi Kapatma
+```bash
+export TELEMETRY_ENABLED=false
+```
+
+### 🔧 Monitoring Endpoints
+
+#### Jaeger Ports
+- **16686**: Jaeger UI (Web Interface)
+- **14268**: Jaeger Collector (legacy HTTP)
+- **4317**: OTLP gRPC Receiver (recommended)
+- **4318**: OTLP HTTP Receiver
+
+#### Trace Örnekleri
+
+**HTTP Request Trace:**
+```
+POST /messages/start
+├── middleware.Recovery
+├── middleware.Tracing
+├── handlers.StartAutoSending
+│   ├── messageService.StartAutoSending
+│   │   ├── database.GetPendingMessages
+│   │   ├── webhook.SendMessage
+│   │   └── cache.SetMessage
+│   └── response.SendJSON
+```
+
+**Background Job Trace:**
+```
+scheduler.ProcessMessages
+├── database.GetPendingMessages
+├── for each message:
+│   ├── webhook.SendMessage
+│   ├── database.UpdateStatus
+│   └── cache.SetMessage
+```
 
 ### Health Check
 
