@@ -1,6 +1,18 @@
 app:
-  name: test
+  name: gopulse-messages
   port: 8080
+  read_timeout: 30   
+  write_timeout: 30     
+  idle_timeout: 120   
+  max_header_mb: 1    
+
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  dbname: gopulse_messages
+  sslmode: disable
 
 redis:
   addr: localhost:6379
@@ -8,8 +20,5 @@ redis:
   db: 0
 
 webhook:
-  host: http://localhost:8080
-  path: /webhook
-
-
-
+  host: https://webhook.site
+  path: /unique-webhook-id

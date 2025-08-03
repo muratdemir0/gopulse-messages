@@ -7,8 +7,12 @@ import (
 )
 
 type App struct {
-	Name string `mapstructure:"name"`
-	Port int    `mapstructure:"port"`
+	Name         string `mapstructure:"name"`
+	Port         int    `mapstructure:"port"`
+	ReadTimeout  int    `mapstructure:"read_timeout"`  
+	WriteTimeout int    `mapstructure:"write_timeout"` 
+	IdleTimeout  int    `mapstructure:"idle_timeout"`  
+	MaxHeaderMB  int    `mapstructure:"max_header_mb"` 
 }
 
 type Webhook struct {
@@ -22,10 +26,20 @@ type Redis struct {
 	DB       int    `mapstructure:"db"`
 }
 
+type Database struct {
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	User     string `mapstructure:"user"`
+	Password string `mapstructure:"password"`
+	DBName   string `mapstructure:"dbname"`
+	SSLMode  string `mapstructure:"sslmode"`
+}
+
 type Config struct {
-	App     App     `mapstructure:"app"`
-	Webhook Webhook `mapstructure:"webhook"`
-	Redis   Redis   `mapstructure:"redis"`
+	App      App      `mapstructure:"app"`
+	Webhook  Webhook  `mapstructure:"webhook"`
+	Redis    Redis    `mapstructure:"redis"`
+	Database Database `mapstructure:"database"`
 }
 
 func Load(path string) (*Config, error) {

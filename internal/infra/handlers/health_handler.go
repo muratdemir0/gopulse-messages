@@ -6,8 +6,7 @@ type HealthHandler struct {
 }
 
 func (h *HealthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	JSON(w, r, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func RegisterHealthHandler(mux *http.ServeMux) {

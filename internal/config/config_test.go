@@ -1,4 +1,5 @@
 //go:build unit
+
 package config_test
 
 import (
@@ -14,10 +15,10 @@ func TestLoad(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, cfg)
 
-		assert.Equal(t, "test", cfg.App.Name)
+		assert.Equal(t, "gopulse-messages", cfg.App.Name)
 		assert.Equal(t, 8080, cfg.App.Port)
-		assert.Equal(t, "http://localhost:8080", cfg.Webhook.Host)
-		assert.Equal(t, "/webhook/gopulse-messages", cfg.Webhook.Path)
+		assert.Equal(t, "https://webhook.site", cfg.Webhook.Host)
+		assert.Equal(t, "/unique-webhook-id", cfg.Webhook.Path)
 		assert.Equal(t, "localhost:6379", cfg.Redis.Addr)
 		assert.Equal(t, "", cfg.Redis.Password)
 		assert.Equal(t, 0, cfg.Redis.DB)
