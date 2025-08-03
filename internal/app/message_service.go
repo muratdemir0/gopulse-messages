@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -12,10 +13,15 @@ import (
 	"github.com/muratdemir0/gopulse-messages/internal/infra/cache"
 )
 
+type messageCacheData struct {
+	MessageID string `json:"messageId"`
+	SentAt    string `json:"sentAt"`
+}
+
 type MessageService struct {
 	messageRepo   domain.MessageRepository
 	webhookClient *webhook.Client
-	cache  *cache.Cache
+	cache         *cache.Cache
 	scheduler     *Scheduler
 	webhookPath   string
 }
@@ -29,7 +35,7 @@ func NewMessageService(
 	service := &MessageService{
 		messageRepo:   messageRepo,
 		webhookClient: webhookClient,
-		cache:  cache,
+		cache:         cache,
 		webhookPath:   webhookPath,
 	}
 
@@ -65,7 +71,7 @@ func (s *MessageService) processMessages(ctx context.Context) error {
 	log.Printf("Processing %d messages", len(messages))
 
 	for _, message := range messages {
-		if err := s.sendMessage(ctx, message); err != nil {
+		if err := s.processMessage(ctx, message); err != nil {
 			log.Printf("Error sending message ID %d: %v", message.ID, err)
 			if err := s.messageRepo.IncrementRetry(ctx, message.ID, time.Now()); err != nil {
 				log.Printf("Error incrementing retry for message ID %d: %v", message.ID, err)
@@ -76,29 +82,57 @@ func (s *MessageService) processMessages(ctx context.Context) error {
 	return nil
 }
 
-func (s *MessageService) sendMessage(ctx context.Context, message domain.Message) error {
-	webhookReq := webhook.Request{
+func (s *MessageService) processMessage(ctx context.Context, message domain.Message) error {
+	webhookReq := s.buildWebhookRequest(message)
+
+	resp, err := s.sendWebhookRequest(ctx, webhookReq)
+	if err != nil {
+		return s.handleSendFailure(ctx, message, err)
+	}
+
+	return s.handleSendSuccess(ctx, message, resp)
+}
+
+func (s *MessageService) buildWebhookRequest(message domain.Message) webhook.Request {
+	return webhook.Request{
 		To:      message.Recipient,
 		Content: message.Content,
 	}
+}
 
-	resp, err := s.webhookClient.Send(ctx, webhookReq, s.webhookPath)
-	if err != nil {
-		updatedMessage := message
-		updatedMessage.Status = domain.MessageStatusFailed
-		updatedMessage.ErrorMessage = sql.NullString{String: err.Error(), Valid: true}
+func (s *MessageService) sendWebhookRequest(ctx context.Context, req webhook.Request) (*webhook.Response, error) {
+	return s.webhookClient.Send(ctx, req, s.webhookPath)
+}
 
-		if updateErr := s.messageRepo.Update(ctx, updatedMessage); updateErr != nil {
-			log.Printf("Error updating failed message ID %d: %v", message.ID, updateErr)
-		}
+func (s *MessageService) handleSendFailure(ctx context.Context, message domain.Message, sendErr error) error {
+	updatedMessage := message
+	updatedMessage.Status = domain.MessageStatusFailed
+	updatedMessage.ErrorMessage = sql.NullString{String: sendErr.Error(), Valid: true}
 
-		return fmt.Errorf("webhook send failed: %w", err)
+	if updateErr := s.messageRepo.Update(ctx, updatedMessage); updateErr != nil {
+		log.Printf("Error updating failed message ID %d: %v", message.ID, updateErr)
 	}
 
+	return fmt.Errorf("webhook send failed: %w", sendErr)
+}
+
+func (s *MessageService) handleSendSuccess(ctx context.Context, message domain.Message, resp *webhook.Response) error {
 	now := time.Now()
+
+	if err := s.updateMessageAsSuccessful(ctx, message, resp, now); err != nil {
+		return err
+	}
+
+	s.cacheMessageResult(ctx, message.ID, resp.MessageID, now)
+	log.Printf("Successfully sent message ID %d to %s", message.ID, message.Recipient)
+
+	return nil
+}
+
+func (s *MessageService) updateMessageAsSuccessful(ctx context.Context, message domain.Message, resp *webhook.Response, sentAt time.Time) error {
 	updatedMessage := message
 	updatedMessage.Status = domain.MessageStatusSent
-	updatedMessage.SentAt = sql.NullTime{Time: now, Valid: true}
+	updatedMessage.SentAt = sql.NullTime{Time: sentAt, Valid: true}
 	updatedMessage.ResponseID = sql.NullString{String: resp.MessageID, Valid: true}
 
 	if err := s.messageRepo.Update(ctx, updatedMessage); err != nil {
@@ -106,15 +140,26 @@ func (s *MessageService) sendMessage(ctx context.Context, message domain.Message
 		return fmt.Errorf("failed to update message status: %w", err)
 	}
 
-	// Cache the sent message information
-	cacheKey := fmt.Sprintf("message:%d", message.ID)
-	cacheData := fmt.Sprintf(`{"messageId":"%s","sentAt":"%s"}`, resp.MessageID, now.Format(time.RFC3339))
-	if err := s.cache.Set(ctx, cacheKey, cacheData); err != nil {
-		log.Printf("Error caching message ID %d: %v", message.ID, err)
+	return nil
+}
+
+func (s *MessageService) cacheMessageResult(ctx context.Context, messageID int64, responseID string, sentAt time.Time) {
+	cacheKey := fmt.Sprintf("message:%d", messageID)
+
+	data := messageCacheData{
+		MessageID: responseID,
+		SentAt:    sentAt.Format(time.RFC3339),
 	}
 
-	log.Printf("Successfully sent message ID %d to %s", message.ID, message.Recipient)
-	return nil
+	cacheData, err := json.Marshal(data)
+	if err != nil {
+		log.Printf("Error marshaling cache data for message ID %d: %v", messageID, err)
+		return
+	}
+
+	if err := s.cache.Set(ctx, cacheKey, string(cacheData)); err != nil {
+		log.Printf("Error caching message ID %d: %v", messageID, err)
+	}
 }
 
 func (s *MessageService) GetSentMessages(ctx context.Context, limit, offset uint) ([]domain.Message, error) {
