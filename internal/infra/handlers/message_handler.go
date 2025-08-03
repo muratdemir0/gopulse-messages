@@ -4,13 +4,13 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/muratdemir0/gopulse-messages/api/rest"
 	"github.com/muratdemir0/gopulse-messages/internal/app"
 )
 
 type MessageHandler struct {
 	service *app.MessageService
 }
-
 
 func (h *MessageHandler) StartAutoSending(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.StartAutoSending(); err != nil {
@@ -67,10 +67,13 @@ func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	JSON(w, r, http.StatusOK, map[string]interface{}{
-		"messages": messages,
-		"count":    len(messages),
-	})
+	messageResponses := rest.ToMessageResponses(messages)
+	response := rest.MessagesListResponse{
+		Messages: messageResponses,
+		Count:    len(messageResponses),
+	}
+
+	JSON(w, r, http.StatusOK, response)
 }
 
 func RegisterMessageHandler(mux *http.ServeMux, service *app.MessageService) {

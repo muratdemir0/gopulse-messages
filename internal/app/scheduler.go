@@ -54,12 +54,6 @@ func (s *Scheduler) Stop() {
 	<-s.stopCh
 }
 
-func (s *Scheduler) IsRunning() bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.running
-}
-
 func (s *Scheduler) run() {
 	defer func() {
 		close(s.stopCh)
