@@ -213,8 +213,7 @@ func (a *App) setupRoutes() http.Handler {
 
 	// Add swagger
 	handler := httpSwagger.Handler(
-		httpSwagger.URL("http://localhost:8080/swagger/doc.json"), // Spec’lerin URL’i
-		// httpSwagger.DocExpansion("none"), // isteğe bağlı daha fazla config
+		httpSwagger.URL(fmt.Sprintf("http://localhost:%d/swagger/doc.json", a.config.App.Port)),
 	)
 	mux.Handle("/swagger/", handler)
 
