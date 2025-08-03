@@ -1,8 +1,5 @@
-# GoPulse Messages Docker Compose Configuration
-# This configuration sets up the complete application stack with all dependencies
 
 services:
-  # Main application server
   server:
     build:
       context: .
@@ -15,11 +12,8 @@ services:
       redis:
         condition: service_healthy
     environment:
-      # Set environment - app will load .config/dev.yaml
       - APP_ENV=dev
-      # Database configuration - single DSN
       - DATABASE_DSN=postgres://postgres:postgres@db:5432/gopulse_messages?sslmode=disable
-      # Redis configuration
       - REDIS_ADDR=redis:6379
       - REDIS_PASSWORD=
       - REDIS_DB=0
@@ -27,7 +21,6 @@ services:
     networks:
       - gopulse-network
 
-  # PostgreSQL Database
   db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -48,7 +41,6 @@ services:
     networks:
       - gopulse-network
 
-  # Redis Cache
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -64,14 +56,12 @@ services:
     networks:
       - gopulse-network
 
-# Persistent volumes for data storage
 volumes:
   postgres-data:
     driver: local
   redis-data:
     driver: local
 
-# Network for service communication
 networks:
   gopulse-network:
     driver: bridge
