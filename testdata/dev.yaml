@@ -1,6 +1,10 @@
 app:
   name: gopulse-messages
   port: 8080
+  read_timeout: 30   
+  write_timeout: 30     
+  idle_timeout: 120   
+  max_header_mb: 1    
 
 database:
   host: localhost

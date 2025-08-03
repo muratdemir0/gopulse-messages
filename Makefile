@@ -18,6 +18,12 @@ govulncheck:
 gosec:
 	gosec ./...
 
+pre-commit:
+	make unit-test
+	make integration-test
+	make linter
+	make gosec
+	make govulncheck
 
 migrate-create:
 	migrate create -ext sql -dir migrations -seq $(name)
