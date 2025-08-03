@@ -20,13 +20,8 @@ func NewTracerProvider(serviceName, otlpEndpoint string, sampleRate float64) (*T
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	gRPCEndpoint := otlpEndpoint
-	if otlpEndpoint == "jaeger:4318" {
-		gRPCEndpoint = "jaeger:4317"
-	}
-
 	exporter, err := otlptracegrpc.New(ctx,
-		otlptracegrpc.WithEndpoint(gRPCEndpoint),
+		otlptracegrpc.WithEndpoint(otlpEndpoint),
 		otlptracegrpc.WithInsecure(),
 	)
 	if err != nil {

@@ -254,10 +254,9 @@ func (a *App) setupRoutes() http.Handler {
 	)
 	mux.Handle("/swagger/", handler)
 
-	// Apply middleware chain
+	
 	wrappedHandler := middleware.Recovery(mux)
 
-	// Add tracing middleware if telemetry is enabled
 	if a.config.Telemetry.Enabled && a.tracerProvider != nil {
 		wrappedHandler = middleware.Tracing(a.config.Telemetry.ServiceName)(wrappedHandler)
 		slog.Info("Tracing middleware enabled", "service", a.config.Telemetry.ServiceName)
