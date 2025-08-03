@@ -27,6 +27,7 @@ import (
 	"github.com/muratdemir0/gopulse-messages/internal/infra/database"
 	"github.com/muratdemir0/gopulse-messages/internal/infra/handlers"
 	"github.com/muratdemir0/gopulse-messages/internal/infra/middleware"
+	"github.com/muratdemir0/gopulse-messages/internal/telemetry"
 	redisclient "github.com/redis/go-redis/v9"
 )
 
@@ -37,6 +38,7 @@ type App struct {
 	messageService    *app.MessageService
 	server            *http.Server
 	randomMessageRepo *database.MessageRepository
+	tracerProvider    *telemetry.TracerProvider
 }
 
 // @title       GoPulse Messages API
@@ -95,6 +97,10 @@ func NewApp() (*App, error) {
 		return nil, fmt.Errorf("failed to initialize redis: %w", err)
 	}
 
+	if err := app.initTelemetry(); err != nil {
+		slog.Warn("Failed to initialize telemetry", "error", err)
+	}
+
 	app.initServices()
 	app.initServer()
 
@@ -140,6 +146,14 @@ func (a *App) Stop() {
 }
 
 func (a *App) Close() {
+	if a.tracerProvider != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := a.tracerProvider.Shutdown(ctx); err != nil {
+			slog.Warn("failed to shutdown tracer provider", "error", err)
+		}
+	}
+
 	if a.db != nil {
 		if err := a.db.Close(); err != nil {
 			slog.Warn("failed to close database connection", "error", err)
@@ -170,6 +184,30 @@ func (a *App) initRedis() error {
 	}
 	a.redis = redisClient
 	slog.Info("Redis connection established")
+	return nil
+}
+
+func (a *App) initTelemetry() error {
+	if !a.config.Telemetry.Enabled {
+		slog.Info("Telemetry disabled")
+		return nil
+	}
+
+	tp, err := telemetry.NewTracerProvider(
+		a.config.Telemetry.ServiceName,
+		a.config.Telemetry.OTLPEndpoint,
+		a.config.Telemetry.SampleRate,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize telemetry: %w", err)
+	}
+
+	a.tracerProvider = tp
+	slog.Info("Telemetry initialized",
+		"service", a.config.Telemetry.ServiceName,
+		"endpoint", a.config.Telemetry.OTLPEndpoint,
+		"sample_rate", a.config.Telemetry.SampleRate)
+
 	return nil
 }
 
@@ -216,7 +254,16 @@ func (a *App) setupRoutes() http.Handler {
 	)
 	mux.Handle("/swagger/", handler)
 
-	return middleware.Recovery(mux)
+	// Apply middleware chain
+	wrappedHandler := middleware.Recovery(mux)
+
+	// Add tracing middleware if telemetry is enabled
+	if a.config.Telemetry.Enabled && a.tracerProvider != nil {
+		wrappedHandler = middleware.Tracing(a.config.Telemetry.ServiceName)(wrappedHandler)
+		slog.Info("Tracing middleware enabled", "service", a.config.Telemetry.ServiceName)
+	}
+
+	return wrappedHandler
 }
 
 func (a *App) setupHTTPServer(handler http.Handler) *http.Server {
@@ -270,8 +317,16 @@ func loadConfig() (*config.Config, error) {
 		}
 	}
 
+	if endpoint := os.Getenv("TELEMETRY_OTLP_ENDPOINT"); endpoint != "" {
+		cfg.Telemetry.OTLPEndpoint = endpoint
+	}
+	if enabled := os.Getenv("TELEMETRY_ENABLED"); enabled != "" {
+		cfg.Telemetry.Enabled = enabled == "true"
+	}
+
 	slog.Info("Database DSN", "dsn", cfg.Database.DSN)
 	slog.Info("Redis config", "addr", cfg.Redis.Addr)
+	slog.Info("Telemetry config", "endpoint", cfg.Telemetry.OTLPEndpoint, "enabled", cfg.Telemetry.Enabled)
 
 	return cfg, nil
 }

@@ -10,6 +10,8 @@ import (
 
 	"github.com/doug-martin/goqu/v9/dialect/postgres"
 	"github.com/google/uuid"
+	"github.com/uptrace/opentelemetry-go-extra/otelsql"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -50,10 +52,15 @@ func NewDB(dsn string) *Client {
 	goqu.RegisterDialect("default", dialectOptions)
 	goqu.SetDefaultPrepared(true)
 
-	db, err := sqlx.Open("postgres", dsn)
+	sqlDB, err := otelsql.Open("postgres", dsn,
+		otelsql.WithAttributes(semconv.DBSystemPostgreSQL),
+		otelsql.WithDBName("gopulse_messages"),
+	)
 	if err != nil {
 		panic(err)
 	}
+
+	db := sqlx.NewDb(sqlDB, "postgres")
 
 	db.SetMaxOpenConns(MaxOpenConnections)
 	db.SetMaxIdleConns(MaxIdleConnections)

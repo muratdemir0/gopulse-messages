@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 const (
@@ -45,8 +46,9 @@ type RetryConfig struct {
 }
 
 type Config struct {
-	Transport   *http.Transport
-	RetryConfig *RetryConfig
+	Transport           *http.Transport
+	RetryConfig         *RetryConfig
+	EnableOpenTelemetry bool
 }
 
 type Client struct {
@@ -58,11 +60,11 @@ func DefaultTransport() *http.Transport {
 	return createOptimizedTransport()
 }
 
-
 func NewClient(configs ...Config) *Client {
 	cfg := Config{
-		Transport:   DefaultTransport(),
-		RetryConfig: nil,
+		Transport:           DefaultTransport(),
+		RetryConfig:         nil,
+		EnableOpenTelemetry: true,
 	}
 
 	if len(configs) > 0 {
@@ -73,11 +75,17 @@ func NewClient(configs ...Config) *Client {
 		if userConfig.RetryConfig != nil {
 			cfg.RetryConfig = userConfig.RetryConfig
 		}
+		cfg.EnableOpenTelemetry = userConfig.EnableOpenTelemetry
+	}
+
+	var transport http.RoundTripper = cfg.Transport
+	if cfg.EnableOpenTelemetry {
+		transport = otelhttp.NewTransport(cfg.Transport)
 	}
 
 	return &Client{
 		httpClient: &http.Client{
-			Transport: cfg.Transport,
+			Transport: transport,
 			Timeout:   DefaultRequestTimeout,
 		},
 		retryConfig: cfg.RetryConfig,

@@ -30,11 +30,19 @@ type Database struct {
 	DSN string `mapstructure:"dsn"`
 }
 
+type Telemetry struct {
+	ServiceName  string  `mapstructure:"service_name"`
+	OTLPEndpoint string  `mapstructure:"otlp_endpoint"`
+	Enabled      bool    `mapstructure:"enabled"`
+	SampleRate   float64 `mapstructure:"sample_rate"`
+}
+
 type Config struct {
-	App      App      `mapstructure:"app"`
-	Webhook  Webhook  `mapstructure:"webhook"`
-	Redis    Redis    `mapstructure:"redis"`
-	Database Database `mapstructure:"database"`
+	App       App       `mapstructure:"app"`
+	Webhook   Webhook   `mapstructure:"webhook"`
+	Redis     Redis     `mapstructure:"redis"`
+	Database  Database  `mapstructure:"database"`
+	Telemetry Telemetry `mapstructure:"telemetry"`
 }
 
 func Load(path string) (*Config, error) {

@@ -16,4 +16,9 @@ redis:
 
 webhook:
   host: https://webhook.site
-  path: /unique-webhook-id
+  path: 9982a1bc-3635-4dae-b533-9e8d1f7efed8
+
+telemetry:
+  service_name: gopulse-messages
+  enabled: true
+  sample_rate: 1.0

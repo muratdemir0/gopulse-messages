@@ -22,3 +22,9 @@ redis:
 webhook:
   host: https://webhook.site
   path: /unique-webhook-id
+
+telemetry:
+  service_name: gopulse-messages
+  otlp_endpoint: http://localhost:4318
+  enabled: true
+  sample_rate: 1.0
