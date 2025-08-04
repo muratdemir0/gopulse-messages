@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
+
 	"github.com/muratdemir0/gopulse-messages/internal/adapters/ohttp"
 )
 
@@ -39,7 +41,10 @@ func (c *Client) Send(ctx context.Context, message Request, path string) (*Respo
 		return nil, err
 	}
 
-	fullUrl := fmt.Sprintf("%s/%s", c.Host, path)
+	fullUrl, err := url.JoinPath(c.Host, path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to join URL path: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullUrl, bytes.NewBuffer(payload))
 	if err != nil {
