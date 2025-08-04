@@ -39,6 +39,8 @@ func (s *Scheduler) Start() {
 		return
 	}
 
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	s.stopCh = make(chan struct{})
 	s.running = true
 	go s.run()
 }
@@ -54,11 +56,15 @@ func (s *Scheduler) Stop() {
 	s.running = false
 	s.cancel()
 	<-s.stopCh
+
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	s.stopCh = make(chan struct{})
 }
 
 func (s *Scheduler) run() {
+	localStopCh := s.stopCh
 	defer func() {
-		close(s.stopCh)
+		close(localStopCh)
 	}()
 
 	ticker := time.NewTicker(s.interval)

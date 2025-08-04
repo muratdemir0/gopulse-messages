@@ -146,3 +146,36 @@ func TestScheduler_StopCancelsContext(t *testing.T) {
 		t.Fatal("Stop() did not complete in time, context was likely not cancelled")
 	}
 }
+
+func TestScheduler_MultipleStartStopCycles(t *testing.T) {
+	var executions int32
+	task := func(ctx context.Context) error {
+		atomic.AddInt32(&executions, 1)
+		return nil
+	}
+
+	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
+	scheduler := app.NewScheduler(10*time.Millisecond, task, logger)
+
+
+	scheduler.Start()
+	time.Sleep(25 * time.Millisecond)
+	scheduler.Stop()
+
+	firstCycleExecutions := atomic.LoadInt32(&executions)
+	assert.True(t, firstCycleExecutions >= 2, "expected at least 2 executions in first cycle, got %d", firstCycleExecutions)
+
+	scheduler.Start()
+	time.Sleep(25 * time.Millisecond)
+	scheduler.Stop()
+
+	totalExecutions := atomic.LoadInt32(&executions)
+	assert.True(t, totalExecutions > firstCycleExecutions, "second cycle should have additional executions")
+
+	scheduler.Start()
+	time.Sleep(25 * time.Millisecond)
+	scheduler.Stop()
+
+	finalExecutions := atomic.LoadInt32(&executions)
+	assert.True(t, finalExecutions > totalExecutions, "third cycle should have additional executions")
+}
