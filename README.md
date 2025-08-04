@@ -19,7 +19,7 @@ git clone https://github.com/muratdemir0/gopulse-messages.git
 cd gopulse-messages
 
 # Docker Compose ile başlat
-docker-compose up -d
+docker compose up -d --build
 ```
 
 ## 🌐 Servisler
