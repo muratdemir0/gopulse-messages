@@ -108,11 +108,13 @@ func NewApp() (*App, error) {
 }
 
 func (a *App) Start() error {
-	if err := a.messageService.StartAutoSending(); err != nil {
-		slog.Warn("failed to start automatic message sending", "error", err)
-	} else {
-		slog.Info("Automatic message sending started")
-	}
+	go func() {
+		if err := a.messageService.StartAutoSending(); err != nil {
+			slog.Warn("failed to start automatic message sending", "error", err)
+		} else {
+			slog.Info("Automatic message sending started")
+		}
+	}()
 
 	go a.startProducing(context.Background())
 
@@ -254,7 +256,6 @@ func (a *App) setupRoutes() http.Handler {
 		httpSwagger.URL(fmt.Sprintf("http://localhost:%d/swagger/doc.json", a.config.App.Port)),
 	)
 	mux.Handle("/swagger/", handler)
-
 
 	wrappedHandler := middleware.Recovery(mux)
 

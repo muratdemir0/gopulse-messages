@@ -70,6 +70,22 @@ func (r *MessageRepository) GetAll(ctx context.Context) ([]domain.Message, error
 	return messages, nil
 }
 
+func (r *MessageRepository) GetAllDue(ctx context.Context) ([]domain.Message, error) {
+	ds := goqu.From(tableName).
+		Where(
+			goqu.C("status").Eq(domain.MessageStatusPending),
+			goqu.C("retry_count").Lt(maxRetryCount),
+		).
+		Order(goqu.C("created_at").Asc())
+
+	var messages []domain.Message
+	err := r.db.Select(ctx, &messages, ds)
+	if err != nil {
+		return nil, fmt.Errorf("error getting all due messages: %w", err)
+	}
+	return messages, nil
+}
+
 func (r *MessageRepository) FindDue(ctx context.Context, limit uint) ([]domain.Message, error) {
 	ds := goqu.From(tableName).
 		Where(

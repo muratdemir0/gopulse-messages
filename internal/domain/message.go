@@ -32,6 +32,7 @@ type Message struct {
 type MessageRepository interface {
 	Update(ctx context.Context, message Message) error
 	GetAll(ctx context.Context) ([]Message, error)
+	GetAllDue(ctx context.Context) ([]Message, error)
 	FindDue(ctx context.Context, limit uint) ([]Message, error)
 	IncrementRetry(ctx context.Context, id int64, attemptTime time.Time) error
 	ListByStatus(ctx context.Context, status string, limit, offset uint) ([]Message, error)

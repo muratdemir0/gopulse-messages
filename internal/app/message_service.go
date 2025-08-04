@@ -48,6 +48,12 @@ func NewMessageService(
 }
 
 func (s *MessageService) StartAutoSending() error {
+	ctx := context.Background()
+	s.logger.Info("Processing existing unsent messages on startup...")
+	if err := s.processAllMessages(ctx); err != nil {
+		s.logger.Error("Error processing messages on startup", "error", err)
+	}
+
 	s.scheduler.Start()
 	s.logger.Info("Automatic message sending started")
 	return nil
@@ -56,6 +62,44 @@ func (s *MessageService) StartAutoSending() error {
 func (s *MessageService) StopAutoSending() error {
 	s.scheduler.Stop()
 	s.logger.Info("Automatic message sending stopped")
+	return nil
+}
+
+func (s *MessageService) processAllMessages(ctx context.Context) error {
+	messages, err := s.messageRepo.GetAllDue(ctx)
+	if err != nil {
+		s.logger.Error("Error finding all due messages", "error", err)
+		return err
+	}
+
+	if len(messages) == 0 {
+		s.logger.Info("No pending messages to process on startup")
+		return nil
+	}
+
+	s.logger.Info("Processing all pending messages on startup", "count", len(messages))
+
+	const batchSize = 10
+	for i := 0; i < len(messages); i += batchSize {
+		end := i + batchSize
+		if end > len(messages) {
+			end = len(messages)
+		}
+
+		batch := messages[i:end]
+		s.logger.Info("Processing message batch", "batch", i/batchSize+1, "size", len(batch))
+
+		for _, message := range batch {
+			if err := s.processMessage(ctx, message); err != nil {
+				s.logger.Error("Error sending message in startup batch", "message_id", message.ID, "error", err)
+				if err := s.messageRepo.IncrementRetry(ctx, message.ID, time.Now()); err != nil {
+					s.logger.Error("Error incrementing retry for message in startup batch", "message_id", message.ID, "error", err)
+				}
+			}
+		}
+	}
+
+	s.logger.Info("Completed processing all pending messages on startup", "total_processed", len(messages))
 	return nil
 }
 
